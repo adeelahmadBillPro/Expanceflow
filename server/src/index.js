@@ -90,13 +90,17 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// Start server only when run directly (not when imported by Vercel)
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
 
-  // Check recurring invoices on startup and every hour
-  const { processRecurringInvoices, markOverdueInvoices } = require('./utils/recurringCheck');
-  processRecurringInvoices();
-  markOverdueInvoices();
-  setInterval(processRecurringInvoices, 60 * 60 * 1000);
-  setInterval(markOverdueInvoices, 60 * 60 * 1000);
-});
+    const { processRecurringInvoices, markOverdueInvoices } = require('./utils/recurringCheck');
+    processRecurringInvoices();
+    markOverdueInvoices();
+    setInterval(processRecurringInvoices, 60 * 60 * 1000);
+    setInterval(markOverdueInvoices, 60 * 60 * 1000);
+  });
+}
+
+module.exports = app;
