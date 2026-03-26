@@ -1,16 +1,16 @@
 {
-  "buildCommand": "cd client && npm install && npm run build && cd ../server && npm install && npx prisma generate",
+  "buildCommand": "npm install --prefix client && npm run build --prefix client && npm install --prefix server && cd server && npx prisma generate",
   "outputDirectory": "client/dist",
   "framework": null,
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/uploads/(.*)", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "functions": {
     "api/index.js": {
       "memory": 1024,
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "server/**"
     }
   }
 }
