@@ -6,8 +6,40 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import api from '../lib/api';
 import { formatCurrency, formatDate } from '../lib/utils';
-import { PageHeader, Card, Select, Spinner, StatCard } from '../components/UI';
+import { PageHeader, Card, Button, Select, Spinner, StatCard } from '../components/UI';
 import toast from 'react-hot-toast';
+
+// PDF export helper
+async function exportReportPDF(title, headers, rows, totalsRow) {
+  const pdfMake = (await import('pdfmake/build/pdfmake')).default;
+  const pdfFonts = (await import('pdfmake/build/vfs_fonts')).default;
+  pdfMake.vfs = pdfFonts.pdfMake ? pdfFonts.pdfMake.vfs : pdfFonts.vfs;
+
+  const tableBody = [
+    headers.map((h) => ({ text: h, bold: true, fontSize: 9, fillColor: '#4f46e5', color: '#fff', margin: [4, 4, 4, 4] })),
+    ...rows.map((row, i) =>
+      row.map((cell) => ({ text: String(cell), fontSize: 9, margin: [4, 3, 4, 3], fillColor: i % 2 ? '#f8fafc' : null }))
+    ),
+  ];
+  if (totalsRow) {
+    tableBody.push(totalsRow.map((cell) => ({ text: String(cell), bold: true, fontSize: 9, margin: [4, 4, 4, 4], fillColor: '#eef2ff' })));
+  }
+
+  const dd = {
+    pageSize: 'A4',
+    pageMargins: [40, 40, 40, 40],
+    content: [
+      { text: title, fontSize: 18, bold: true, color: '#1e293b', margin: [0, 0, 0, 15] },
+      { text: 'Generated: ' + new Date().toLocaleDateString(), fontSize: 9, color: '#94a3b8', margin: [0, 0, 0, 10] },
+      {
+        table: { headerRows: 1, widths: headers.map(() => '*'), body: tableBody },
+        layout: { hLineWidth: () => 0.5, vLineWidth: () => 0, hLineColor: () => '#e2e8f0' },
+      },
+    ],
+  };
+  pdfMake.createPdf(dd).download(title.replace(/\s+/g, '_') + '.pdf');
+  toast.success('PDF downloaded');
+}
 
 const TABS = [
   { key: 'profit-loss', label: 'Profit & Loss' },
@@ -69,12 +101,22 @@ function ProfitLossTab() {
 
   return (
     <div className="space-y-6">
-      <div className="max-w-[180px]">
-        <Select label="Year" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {years.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </Select>
+      <div className="flex items-end gap-3">
+        <div className="max-w-[180px]">
+          <Select label="Year" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {years.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </Select>
+        </div>
+        <Button variant="secondary" onClick={() => exportReportPDF(
+          `Profit & Loss Report ${year}`,
+          ['Month', 'Income', 'Expenses', 'Profit'],
+          months.map((m) => [m.month, formatCurrency(m.income), formatCurrency(m.expenses), formatCurrency(m.profit)]),
+          ['TOTAL', formatCurrency(totals.income), formatCurrency(totals.expenses), formatCurrency(totals.profit)]
+        )}>
+          <HiOutlineDocumentArrowDown className="w-4 h-4" /> PDF
+        </Button>
       </div>
 
       {/* Chart */}
@@ -218,6 +260,14 @@ function GSTSummaryTab() {
           <HiOutlineDocumentArrowDown className="w-4 h-4" />
           Download CSV
         </motion.button>
+        <Button variant="secondary" onClick={() => exportReportPDF(
+          `GST Summary Report`,
+          ['Invoice #', 'Date', 'Client', 'NTN', 'Subtotal', 'GST', 'Total'],
+          summary.invoices.map((i) => [i.invoiceNumber, formatDate(i.date), i.client, i.clientNTN || '-', formatCurrency(i.subtotal), formatCurrency(i.gstAmount), formatCurrency(i.total)]),
+          ['TOTALS', '', '', '', formatCurrency(summary.totalSales), formatCurrency(summary.totalGst), formatCurrency(summary.totalWithGst)]
+        )}>
+          <HiOutlineDocumentArrowDown className="w-4 h-4" /> Download PDF
+        </Button>
       </div>
 
       {/* Stat Cards */}
