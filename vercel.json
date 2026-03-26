@@ -6,13 +6,11 @@
   "functions": {
     "api/index.js": {
       "memory": 1024,
-      "maxDuration": 30,
-      "includeFiles": "server/**"
+      "maxDuration": 30
     }
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/uploads/(.*)", "destination": "/api" },
     { "source": "/((?!api|_next|favicon|manifest|sw|icons).*)", "destination": "/index.html" }
   ]
 }
