@@ -12,10 +12,13 @@ async function authenticate(req, res, next) {
     const token = header.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.userId = decoded.userId;
-    try {
-      const u = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { name: true } });
-      req.userName = u?.name || 'Unknown';
-    } catch {}
+
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { name: true, isActive: true } });
+    if (!user || !user.isActive) {
+      return res.status(401).json({ error: 'Account is deactivated.' });
+    }
+
+    req.userName = user.name || 'Unknown';
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token.' });

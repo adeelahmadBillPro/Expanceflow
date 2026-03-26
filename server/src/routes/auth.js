@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
+const { Resend } = require('resend');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
@@ -10,9 +11,9 @@ const prisma = new PrismaClient();
 const userSelect = { id: true, email: true, phone: true, name: true, avatar: true, role: true, plan: true, trialEndsAt: true, planExpiresAt: true, createdAt: true };
 
 function generateToken(userId) {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  });
+  const accessToken = jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  const refreshToken = jwt.sign({ userId, type: 'refresh' }, process.env.REFRESH_SECRET || process.env.JWT_SECRET, { expiresIn: '30d' });
+  return { accessToken, refreshToken };
 }
 
 // Register (email or phone)
@@ -83,14 +84,15 @@ router.post('/register', async (req, res) => {
       },
     });
 
-    const token = generateToken(user.id);
+    const { accessToken, refreshToken } = generateToken(user.id);
     res.status(201).json({
       user: {
         ...user,
         teamRole: 'OWNER',
         organization: { id: org.id, name: org.name, logo: null },
       },
-      token,
+      token: accessToken,
+      refreshToken,
     });
   } catch (err) {
     console.error(err);
@@ -135,7 +137,7 @@ router.post('/login', async (req, res) => {
       include: { organization: { select: { id: true, name: true, logo: true } } },
     });
 
-    const token = generateToken(user.id);
+    const { accessToken, refreshToken } = generateToken(user.id);
     res.json({
       user: {
         id: user.id, email: user.email, phone: user.phone, name: user.name,
@@ -144,35 +146,54 @@ router.post('/login', async (req, res) => {
         teamRole: membership?.teamRole || null,
         organization: membership?.organization || null,
       },
-      token,
+      token: accessToken,
+      refreshToken,
     });
   } catch (err) {
     res.status(500).json({ error: 'Login failed' });
   }
 });
 
-// Google OAuth callback
+// Google OAuth callback — verify ID token server-side
 router.post('/google', async (req, res) => {
   try {
-    const { googleId, email, name, avatar } = req.body;
-    if (!googleId || !email) {
-      return res.status(400).json({ error: 'Google authentication data is required' });
+    const { idToken } = req.body;
+    if (!idToken) {
+      return res.status(400).json({ error: 'Google ID token is required' });
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      return res.status(500).json({ error: 'Google OAuth is not configured. Set GOOGLE_CLIENT_ID in .env' });
+    }
+
+    const { OAuth2Client } = require('google-auth-library');
+    const client = new OAuth2Client(clientId);
+
+    let payload;
+    try {
+      const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+      payload = ticket.getPayload();
+    } catch {
+      return res.status(401).json({ error: 'Invalid Google token' });
+    }
+
+    const { sub: googleId, email, name, picture: avatar } = payload;
+    if (!email) {
+      return res.status(400).json({ error: 'Google account has no email' });
     }
 
     let user = await prisma.user.findUnique({ where: { googleId } });
 
     if (!user) {
-      // Check if email already exists (link accounts)
       user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
       if (user) {
-        // Link Google to existing account
         user = await prisma.user.update({
           where: { id: user.id },
           data: { googleId, avatar: avatar || user.avatar },
           select: userSelect,
         });
       } else {
-        // Create new user
         const userCount = await prisma.user.count();
         const role = userCount === 0 ? 'ADMIN' : 'USER';
         const trialEndsAt = new Date();
@@ -181,7 +202,7 @@ router.post('/google', async (req, res) => {
         user = await prisma.user.create({
           data: {
             email: email.toLowerCase(),
-            name,
+            name: name || email.split('@')[0],
             avatar,
             googleId,
             role,
@@ -191,16 +212,14 @@ router.post('/google', async (req, res) => {
           select: userSelect,
         });
 
-        // Auto-create org for Google signup
         const org = await prisma.organization.create({
-          data: { ownerId: user.id, name: name + "'s Business" },
+          data: { ownerId: user.id, name: (name || 'My') + "'s Business" },
         });
         await prisma.teamMember.create({
           data: { orgId: org.id, userId: user.id, teamRole: 'OWNER' },
         });
       }
     } else {
-      // Update avatar on each login
       user = await prisma.user.update({
         where: { id: user.id },
         data: { avatar: avatar || user.avatar },
@@ -212,8 +231,17 @@ router.post('/google', async (req, res) => {
       return res.status(403).json({ error: 'Account is deactivated' });
     }
 
-    const token = generateToken(user.id);
-    res.json({ user, token });
+    const membership = await prisma.teamMember.findFirst({
+      where: { userId: user.id, isActive: true },
+      include: { organization: { select: { id: true, name: true, logo: true } } },
+    });
+
+    const { accessToken, refreshToken } = generateToken(user.id);
+    res.json({
+      user: { ...user, teamRole: membership?.teamRole || null, organization: membership?.organization || null },
+      token: accessToken,
+      refreshToken,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Google login failed' });
@@ -315,6 +343,9 @@ router.post('/forgot-password', async (req, res) => {
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 15);
 
+    // Delete any existing reset tokens for this user
+    await prisma.passwordReset.deleteMany({ where: { userId: user.id } });
+
     await prisma.passwordReset.create({
       data: {
         userId: user.id,
@@ -323,13 +354,25 @@ router.post('/forgot-password', async (req, res) => {
       },
     });
 
-    // In production, send via SMS/email. For dev, return the code.
-    const response = { message: 'Password reset code sent' };
-    if (process.env.NODE_ENV !== 'production') {
-      response.code = code;
+    // Send code via email if available
+    if (user.email && process.env.RESEND_API_KEY) {
+      try {
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        await resend.emails.send({
+          from: 'ExpenseFlow <onboarding@resend.dev>',
+          to: user.email,
+          subject: 'Your password reset code',
+          html: `<p>Your password reset code is: <strong>${code}</strong></p><p>This code expires in 15 minutes.</p>`,
+        });
+      } catch (emailErr) {
+        console.error('Failed to send reset email:', emailErr.message);
+      }
+    } else if (user.phone) {
+      // TODO: Send SMS via Twilio or similar service
+      console.log(`[SMS TODO] Send reset code ${code} to ${user.phone}`);
     }
 
-    res.json(response);
+    res.json({ message: 'Password reset code sent. Check your email or phone.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to process forgot password request' });
@@ -375,6 +418,25 @@ router.post('/reset-password', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// Refresh access token
+router.post('/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ error: 'Refresh token is required' });
+
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET || process.env.JWT_SECRET);
+    if (decoded.type !== 'refresh') return res.status(401).json({ error: 'Invalid token type' });
+
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { id: true, isActive: true } });
+    if (!user || !user.isActive) return res.status(401).json({ error: 'Account not found or deactivated' });
+
+    const accessToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    res.json({ token: accessToken });
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired refresh token' });
   }
 });
 

@@ -3,6 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/auth');
 const { resolveOrg, requireRole } = require('../middleware/org');
 const { logActivity } = require('../utils/activityLog');
+const { checkPlanLimit } = require('../middleware/billing');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -12,8 +13,15 @@ router.use(resolveOrg);
 
 // Generate invoice number
 async function generateInvoiceNumber(orgId) {
-  const count = await prisma.invoice.count({ where: { orgId } });
-  return `INV-${String(count + 1).padStart(5, '0')}`;
+  const maxRetries = 5;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const count = await prisma.invoice.count({ where: { orgId } });
+    const num = `INV-${String(count + 1 + attempt).padStart(5, '0')}`;
+    const exists = await prisma.invoice.findUnique({ where: { invoiceNumber: num } });
+    if (!exists) return num;
+  }
+  // Fallback: use timestamp-based number
+  return `INV-${Date.now().toString(36).toUpperCase()}`;
 }
 
 // Get all invoices
@@ -64,7 +72,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create invoice
-router.post('/', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), async (req, res) => {
+router.post('/', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), checkPlanLimit('invoices'), async (req, res) => {
   try {
     const { clientId, issueDate, dueDate, items, discount, discountType, notes, terms } = req.body;
 
@@ -140,6 +148,85 @@ router.post('/', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), async (req, res)
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to create invoice' });
+  }
+});
+
+// Update invoice (only DRAFT invoices can be edited)
+router.put('/:id', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), async (req, res) => {
+  try {
+    const existing = await prisma.invoice.findFirst({
+      where: { id: req.params.id, orgId: req.orgId },
+    });
+    if (!existing) return res.status(404).json({ error: 'Invoice not found' });
+    if (existing.status !== 'DRAFT') {
+      return res.status(400).json({ error: 'Only DRAFT invoices can be edited' });
+    }
+
+    const { clientId, issueDate, dueDate, items, discount, discountType, notes, terms } = req.body;
+
+    // Validate
+    if (!clientId) return res.status(400).json({ error: 'Client is required' });
+    if (!items || !Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'At least one item is required' });
+    for (const item of items) {
+      if (!item.name || !item.name.trim()) return res.status(400).json({ error: 'All items must have a name' });
+      if (!item.unitPrice || isNaN(parseFloat(item.unitPrice)) || parseFloat(item.unitPrice) < 0) return res.status(400).json({ error: 'All items must have a valid price' });
+      if (!item.quantity || isNaN(parseFloat(item.quantity)) || parseFloat(item.quantity) <= 0) return res.status(400).json({ error: 'All items must have a positive quantity' });
+    }
+
+    // Recalculate
+    let subtotal = 0;
+    let totalTax = 0;
+    const processedItems = items.map((item) => {
+      const lineTotal = parseFloat(item.quantity) * parseFloat(item.unitPrice);
+      const lineTax = lineTotal * (parseFloat(item.taxRate || 17) / 100);
+      subtotal += lineTotal;
+      totalTax += lineTax;
+      return {
+        name: item.name,
+        description: item.description,
+        productId: item.productId || null,
+        quantity: parseFloat(item.quantity),
+        unitPrice: parseFloat(item.unitPrice),
+        taxRate: parseFloat(item.taxRate || 17),
+        taxAmount: Math.round(lineTax * 100) / 100,
+        total: Math.round((lineTotal + lineTax) * 100) / 100,
+      };
+    });
+
+    let discountAmount = 0;
+    if (discount) {
+      discountAmount = discountType === 'PERCENTAGE' ? (subtotal * parseFloat(discount)) / 100 : parseFloat(discount);
+    }
+    const grandTotal = subtotal + totalTax - discountAmount;
+
+    // Transaction: update invoice + delete old items + create new items
+    const invoice = await prisma.$transaction(async (tx) => {
+      await tx.invoiceItem.deleteMany({ where: { invoiceId: req.params.id } });
+
+      return tx.invoice.update({
+        where: { id: req.params.id },
+        data: {
+          clientId,
+          issueDate: new Date(issueDate),
+          dueDate: new Date(dueDate),
+          subtotal: Math.round(subtotal * 100) / 100,
+          taxAmount: Math.round(totalTax * 100) / 100,
+          discount: Math.round(discountAmount * 100) / 100,
+          discountType: discountType || 'FIXED',
+          grandTotal: Math.round(grandTotal * 100) / 100,
+          notes,
+          terms,
+          items: { create: processedItems },
+        },
+        include: { client: true, items: true },
+      });
+    });
+
+    await logActivity(req, { action: 'UPDATE', entity: 'Invoice', entityId: invoice.id, details: `Edited invoice ${invoice.invoiceNumber}` });
+    res.json(invoice);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update invoice' });
   }
 });
 

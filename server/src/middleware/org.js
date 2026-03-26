@@ -5,12 +5,26 @@ const prisma = new PrismaClient();
 // Attaches req.orgId, req.teamRole, req.org to the request
 async function resolveOrg(req, res, next) {
   try {
-    // Check if user has a team membership
-    const membership = await prisma.teamMember.findFirst({
-      where: { userId: req.userId, isActive: true },
-      include: { organization: true },
-      orderBy: { joinedAt: 'asc' }, // First org they joined
-    });
+    const preferredOrgId = req.headers['x-org-id'];
+
+    let membership;
+
+    if (preferredOrgId) {
+      // Check if user is an active member of the requested org
+      membership = await prisma.teamMember.findFirst({
+        where: { userId: req.userId, orgId: preferredOrgId, isActive: true },
+        include: { organization: true },
+      });
+    }
+
+    if (!membership) {
+      // Fallback to first org
+      membership = await prisma.teamMember.findFirst({
+        where: { userId: req.userId, isActive: true },
+        include: { organization: true },
+        orderBy: { joinedAt: 'asc' },
+      });
+    }
 
     if (!membership) {
       return res.status(403).json({ error: 'No organization found. Please create or join one.' });

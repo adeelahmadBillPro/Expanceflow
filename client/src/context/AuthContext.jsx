@@ -28,6 +28,7 @@ export function AuthProvider({ children }) {
   const login = async (identifier, password) => {
     const res = await api.post('/auth/login', { identifier, password });
     localStorage.setItem('token', res.data.token);
+    localStorage.setItem('refreshToken', res.data.refreshToken);
     localStorage.setItem('user', JSON.stringify(res.data.user));
     setUser(res.data.user);
     return res.data;
@@ -37,6 +38,7 @@ export function AuthProvider({ children }) {
   const register = async ({ name, email, phone, password }) => {
     const res = await api.post('/auth/register', { name, email, phone, password });
     localStorage.setItem('token', res.data.token);
+    localStorage.setItem('refreshToken', res.data.refreshToken);
     localStorage.setItem('user', JSON.stringify(res.data.user));
     setUser(res.data.user);
     return res.data;
@@ -46,6 +48,7 @@ export function AuthProvider({ children }) {
   const googleLogin = async (googleData) => {
     const res = await api.post('/auth/google', googleData);
     localStorage.setItem('token', res.data.token);
+    localStorage.setItem('refreshToken', res.data.refreshToken);
     localStorage.setItem('user', JSON.stringify(res.data.user));
     setUser(res.data.user);
     return res.data;
@@ -53,6 +56,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     setUser(null);
   };

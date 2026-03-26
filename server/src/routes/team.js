@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/auth');
 const { resolveOrg, requireRole } = require('../middleware/org');
+const { checkPlanLimit } = require('../middleware/billing');
 const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
@@ -28,7 +29,7 @@ router.get('/', async (req, res) => {
 });
 
 // Add team member (invite by email or phone)
-router.post('/', requireRole('OWNER', 'MANAGER'), async (req, res) => {
+router.post('/', requireRole('OWNER', 'MANAGER'), checkPlanLimit('members'), async (req, res) => {
   try {
     const { name, email, phone, password, teamRole } = req.body;
 

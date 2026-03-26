@@ -2,6 +2,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/auth');
 const { resolveOrg, requireRole } = require('../middleware/org');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -86,6 +87,7 @@ router.post('/', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), async (req, res)
         barcode: barcode || null,
       },
     });
+    await logActivity(req, { action: 'CREATE', entity: 'Product', entityId: product.id, details: 'Added product: ' + name });
     res.status(201).json(product);
   } catch (err) {
     res.status(500).json({ error: 'Failed to create product' });
@@ -110,6 +112,7 @@ router.put('/:id', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), async (req, re
     if (isActive !== undefined) data.isActive = isActive;
 
     const product = await prisma.product.update({ where: { id: req.params.id }, data });
+    await logActivity(req, { action: 'UPDATE', entity: 'Product', entityId: product.id, details: 'Updated product: ' + product.name });
     res.json(product);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update product' });
@@ -125,6 +128,7 @@ router.delete('/:id', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), async (req,
     if (!existing) return res.status(404).json({ error: 'Product not found' });
 
     await prisma.product.delete({ where: { id: req.params.id } });
+    await logActivity(req, { action: 'DELETE', entity: 'Product', entityId: req.params.id, details: 'Deleted product' });
     res.json({ message: 'Product deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete product' });

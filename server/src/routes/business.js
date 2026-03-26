@@ -30,7 +30,7 @@ router.put('/', requireRole('OWNER', 'MANAGER'), upload.single('logo'), async (r
       bankName, bankAccount, bankIban,
       gstRate: gstRate ? parseFloat(gstRate) : 17,
     };
-    if (req.file) data.logo = `/uploads/${req.file.filename}`;
+    if (req.file) data.logo = req.file.path || '/uploads/' + req.file.filename;
 
     const organization = await prisma.organization.update({
       where: { id: req.orgId },

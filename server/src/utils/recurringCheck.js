@@ -1,6 +1,18 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+async function generateInvoiceNumber(orgId) {
+  const maxRetries = 5;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const count = await prisma.invoice.count({ where: { orgId } });
+    const num = `INV-${String(count + 1 + attempt).padStart(5, '0')}`;
+    const exists = await prisma.invoice.findUnique({ where: { invoiceNumber: num } });
+    if (!exists) return num;
+  }
+  // Fallback: use timestamp-based number
+  return `INV-${Date.now().toString(36).toUpperCase()}`;
+}
+
 async function processRecurringInvoices() {
   try {
     const today = new Date();
@@ -27,8 +39,7 @@ async function processRecurringInvoices() {
         const templateInvoice = schedule.invoice;
 
         // Generate new invoice number
-        const count = await prisma.invoice.count({ where: { orgId: schedule.orgId } });
-        const invoiceNumber = `INV-${String(count + 1).padStart(5, '0')}`;
+        const invoiceNumber = await generateInvoiceNumber(schedule.orgId);
 
         // Calculate new dates
         const issueDate = new Date();
@@ -119,4 +130,25 @@ async function processRecurringInvoices() {
   }
 }
 
-module.exports = { processRecurringInvoices };
+async function markOverdueInvoices() {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const result = await prisma.invoice.updateMany({
+      where: {
+        status: 'SENT',
+        dueDate: { lt: today },
+      },
+      data: { status: 'OVERDUE' },
+    });
+
+    if (result.count > 0) {
+      console.log(`Marked ${result.count} invoices as overdue`);
+    }
+  } catch (err) {
+    console.error('Failed to check overdue invoices:', err.message);
+  }
+}
+
+module.exports = { processRecurringInvoices, markOverdueInvoices };

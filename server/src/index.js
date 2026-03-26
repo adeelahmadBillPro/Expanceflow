@@ -89,7 +89,9 @@ app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 
   // Check recurring invoices on startup and every hour
-  const { processRecurringInvoices } = require('./utils/recurringCheck');
+  const { processRecurringInvoices, markOverdueInvoices } = require('./utils/recurringCheck');
   processRecurringInvoices();
+  markOverdueInvoices();
   setInterval(processRecurringInvoices, 60 * 60 * 1000);
+  setInterval(markOverdueInvoices, 60 * 60 * 1000);
 });

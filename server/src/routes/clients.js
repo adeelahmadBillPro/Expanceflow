@@ -2,6 +2,8 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/auth');
 const { resolveOrg, requireRole } = require('../middleware/org');
+const { checkPlanLimit } = require('../middleware/billing');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -38,7 +40,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create client
-router.post('/', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), async (req, res) => {
+router.post('/', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), checkPlanLimit('clients'), async (req, res) => {
   try {
     const { name, email, phone, company, address, city, ntn, notes } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'Client name is required' });
@@ -46,6 +48,7 @@ router.post('/', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), async (req, res)
     const client = await prisma.client.create({
       data: { orgId: req.orgId, name, email, phone, company, address, city, ntn, notes },
     });
+    await logActivity(req, { action: 'CREATE', entity: 'Client', entityId: client.id, details: 'Added client: ' + name });
     res.status(201).json(client);
   } catch (err) {
     res.status(500).json({ error: 'Failed to create client' });
@@ -77,6 +80,7 @@ router.put('/:id', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), async (req, re
       where: { id: req.params.id },
       data: req.body,
     });
+    await logActivity(req, { action: 'UPDATE', entity: 'Client', entityId: client.id, details: 'Updated client: ' + client.name });
     res.json(client);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update client' });
@@ -92,6 +96,7 @@ router.delete('/:id', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), async (req,
     if (!existing) return res.status(404).json({ error: 'Client not found' });
 
     await prisma.client.delete({ where: { id: req.params.id } });
+    await logActivity(req, { action: 'DELETE', entity: 'Client', entityId: req.params.id, details: 'Deleted client' });
     res.json({ message: 'Client deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete client' });

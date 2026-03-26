@@ -3,6 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/auth');
 const { resolveOrg, requireRole } = require('../middleware/org');
 const upload = require('../middleware/upload');
+const { checkPlanLimit } = require('../middleware/billing');
 const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
@@ -64,7 +65,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create expense
-router.post('/', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT', 'CASHIER'), upload.single('receipt'), async (req, res) => {
+router.post('/', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT', 'CASHIER'), checkPlanLimit('expenses'), upload.single('receipt'), async (req, res) => {
   try {
     const { categoryId, amount, description, notes, date, paymentMethod } = req.body;
     if (!categoryId) return res.status(400).json({ error: 'Category is required' });
@@ -81,7 +82,7 @@ router.post('/', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT', 'CASHIER'), uploa
         notes,
         date: new Date(date),
         paymentMethod: paymentMethod || 'CASH',
-        receiptUrl: req.file ? `/uploads/${req.file.filename}` : null,
+        receiptUrl: req.file ? (req.file.path || '/uploads/' + req.file.filename) : null,
       },
       include: { category: true },
     });
@@ -115,7 +116,7 @@ router.put('/:id', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), upload.single(
     if (notes !== undefined) data.notes = notes;
     if (date) data.date = new Date(date);
     if (paymentMethod) data.paymentMethod = paymentMethod;
-    if (req.file) data.receiptUrl = `/uploads/${req.file.filename}`;
+    if (req.file) data.receiptUrl = req.file.path || '/uploads/' + req.file.filename;
 
     const expense = await prisma.expense.update({
       where: { id: req.params.id },

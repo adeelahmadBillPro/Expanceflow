@@ -13,21 +13,31 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-let isRedirecting = false;
+let isRefreshing = false;
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Only handle 401 (unauthorized), not network errors
-    if (error.response?.status === 401 && !isRedirecting) {
-      isRedirecting = true;
+  async (error) => {
+    if (error.response?.status === 401 && !isRefreshing) {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken && error.config && !error.config._retry) {
+        isRefreshing = true;
+        error.config._retry = true;
+        try {
+          const res = await axios.post('/api/auth/refresh', { refreshToken });
+          localStorage.setItem('token', res.data.token);
+          error.config.headers.Authorization = 'Bearer ' + res.data.token;
+          isRefreshing = false;
+          return api(error.config);
+        } catch {
+          // Refresh failed, logout
+        }
+        isRefreshing = false;
+      }
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
-      // Use a small delay to prevent loop
-      setTimeout(() => {
-        window.location.href = '/login';
-        isRedirecting = false;
-      }, 100);
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
