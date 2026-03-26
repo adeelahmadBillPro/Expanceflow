@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineFunnel, HiOutlineMagnifyingGlass, HiOutlineCurrencyDollar, HiOutlineArrowDownTray, HiOutlineCamera } from 'react-icons/hi2';
+import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineFunnel, HiOutlineMagnifyingGlass, HiOutlineCurrencyDollar, HiOutlineArrowDownTray, HiOutlineCamera, HiOutlinePhoto } from 'react-icons/hi2';
 import ReceiptScanner from '../components/ReceiptScanner';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -200,6 +200,11 @@ export default function Expenses() {
                     <button onClick={() => handleDelete(expense.id)} className="p-1.5 hover:bg-red-50 rounded-md text-red-500">
                       <HiOutlineTrash className="w-3.5 h-3.5" />
                     </button>
+                    {expense.receiptUrl && (
+                      <a href={expense.receiptUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-blue-50 rounded-md text-blue-500" title="View Receipt">
+                        <HiOutlinePhoto className="w-3.5 h-3.5" />
+                      </a>
+                    )}
                   </div>
                 </div>
               </motion.div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HiOutlineUser, HiOutlineLockClosed } from 'react-icons/hi2';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -13,6 +13,7 @@ export default function Settings() {
   const [passErrors, setPassErrors] = useState({});
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
 
   const setProfileField = (field, value) => {
     setNameForm((prev) => ({ ...prev, [field]: value }));
@@ -47,8 +48,14 @@ export default function Settings() {
     if (!validateProfile()) return;
     setSavingProfile(true);
     try {
-      await api.put('/auth/profile', nameForm);
+      const formData = new FormData();
+      formData.append('name', nameForm.name);
+      if (avatarFile) formData.append('avatar', avatarFile);
+      await api.put('/auth/profile', formData);
       toast.success('Profile updated');
+      // Refresh user data
+      const me = await api.get('/auth/me');
+      localStorage.setItem('user', JSON.stringify(me.data));
     } catch { toast.error('Failed to update profile'); }
     finally { setSavingProfile(false); }
   };
@@ -82,6 +89,20 @@ export default function Settings() {
             <h3 className="text-sm font-semibold text-slate-700">Profile</h3>
           </div>
           <form onSubmit={updateProfile} className="space-y-4">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-xl overflow-hidden">
+                {user?.avatar ? (
+                  <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  user?.name?.charAt(0)?.toUpperCase()
+                )}
+              </div>
+              <div>
+                <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files[0])}
+                  className="text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-50 file:text-indigo-600 file:font-medium file:text-xs file:cursor-pointer" />
+                <p className="text-[10px] text-slate-400 mt-1">JPG, PNG. Max 5MB.</p>
+              </div>
+            </div>
             <Input label="Email" type="email" value={user?.email || ''} disabled />
             <Input label="Name *" value={nameForm.name} onChange={(e) => setProfileField('name', e.target.value)}
               error={profileErrors.name} placeholder="Your name" />

@@ -31,13 +31,22 @@ export default function GlobalSearch() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Close on Escape
+  const inputRef = useRef(null);
+
+  // Ctrl+K shortcut and Escape
   useEffect(() => {
-    const handleKey = (e) => {
-      if (e.key === 'Escape') setOpen(false);
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+      if (e.key === 'Escape') {
+        setOpen(false);
+        setQuery('');
+      }
     };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // Debounced search
@@ -81,13 +90,15 @@ export default function GlobalSearch() {
       <div className="relative">
         <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input
+          ref={inputRef}
           type="text"
           value={query}
           onChange={handleChange}
           onFocus={() => { if (results && query.trim().length >= 2) setOpen(true); }}
           placeholder="Search expenses, invoices, clients..."
-          className="w-[240px] lg:w-[320px] pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none transition-all duration-150 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 focus:bg-white"
+          className="w-[240px] lg:w-[320px] pl-9 pr-16 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none transition-all duration-150 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 focus:bg-white"
         />
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-mono hidden sm:block">Ctrl+K</span>
         {loading && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
             <div className="w-4 h-4 border-2 border-slate-200 border-t-indigo-600 rounded-full animate-spin" />

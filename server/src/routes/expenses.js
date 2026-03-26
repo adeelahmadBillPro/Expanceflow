@@ -93,6 +93,53 @@ router.post('/', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT', 'CASHIER'), check
       details: `Added expense: ${description || 'N/A'} - PKR ${parseFloat(amount)}`,
     });
 
+    // Check budget alert
+    try {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      const budget = await prisma.budget.findFirst({
+        where: { orgId: req.orgId, categoryId, month: now.getMonth() + 1, year: now.getFullYear() },
+        include: { category: true },
+      });
+
+      if (budget) {
+        const spent = await prisma.expense.aggregate({
+          where: { orgId: req.orgId, categoryId, date: { gte: startOfMonth, lte: endOfMonth } },
+          _sum: { amount: true },
+        });
+        const totalSpent = Number(spent._sum.amount || 0);
+        const pct = Math.round((totalSpent / Number(budget.amount)) * 100);
+
+        if (pct >= 100) {
+          await prisma.notification.create({
+            data: {
+              orgId: req.orgId,
+              type: 'budget_warning',
+              title: `Budget Exceeded: ${budget.category.name}`,
+              message: `You've spent PKR ${totalSpent.toLocaleString()} of PKR ${Number(budget.amount).toLocaleString()} (${pct}%) on ${budget.category.name} this month.`,
+            },
+          });
+        } else if (pct >= 80) {
+          // Check if we already sent an 80% alert this month
+          const existingAlert = await prisma.notification.findFirst({
+            where: { orgId: req.orgId, type: 'budget_warning', title: { contains: budget.category.name }, createdAt: { gte: startOfMonth } },
+          });
+          if (!existingAlert) {
+            await prisma.notification.create({
+              data: {
+                orgId: req.orgId,
+                type: 'budget_warning',
+                title: `Budget Warning: ${budget.category.name}`,
+                message: `You've used ${pct}% of your ${budget.category.name} budget (PKR ${totalSpent.toLocaleString()} of PKR ${Number(budget.amount).toLocaleString()}).`,
+              },
+            });
+          }
+        }
+      }
+    } catch {} // Don't fail expense creation on notification error
+
     res.status(201).json(expense);
   } catch (err) {
     res.status(500).json({ error: 'Failed to create expense' });

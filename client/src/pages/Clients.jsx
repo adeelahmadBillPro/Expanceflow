@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineArrowUpTray, HiOutlineUserGroup } from 'react-icons/hi2';
 import api from '../lib/api';
@@ -142,6 +143,11 @@ export default function Clients() {
                 {client.phone && <p className="text-xs text-slate-400">{client.phone}</p>}
                 <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
                   <span className="text-[11px] text-slate-400">{client._count?.invoices || 0} invoices</span>
+                  {client._count?.invoices > 0 && (
+                    <Link to={`/clients/${client.id}/statement`} className="text-[11px] text-indigo-500 hover:text-indigo-700 font-medium">
+                      Statement
+                    </Link>
+                  )}
                   {client.city && <span className="text-[11px] text-slate-400">{client.city}</span>}
                 </div>
               </div>

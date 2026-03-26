@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const { Resend } = require('resend');
 const { authenticate } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -274,15 +275,17 @@ router.get('/me', authenticate, async (req, res) => {
 });
 
 // Update profile
-router.put('/profile', authenticate, async (req, res) => {
+router.put('/profile', authenticate, upload.single('avatar'), async (req, res) => {
   try {
-    const { name, avatar } = req.body;
+    const { name } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
     }
+    const data = { name: name.trim() };
+    if (req.file) data.avatar = req.file.path || '/uploads/' + req.file.filename;
     const user = await prisma.user.update({
       where: { id: req.userId },
-      data: { name: name.trim(), avatar },
+      data,
       select: userSelect,
     });
     res.json(user);

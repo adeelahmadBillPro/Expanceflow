@@ -7,6 +7,85 @@ import { formatCurrency, formatDate, invoiceStatuses, paymentMethods } from '../
 import { PageHeader, Card, Button, Badge, Spinner } from '../components/UI';
 import toast from 'react-hot-toast';
 
+function RecurringSection({ invoiceId }) {
+  const [schedule, setSchedule] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [frequency, setFrequency] = useState('MONTHLY');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get(`/invoices/${invoiceId}/recurring`)
+      .then((res) => setSchedule(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [invoiceId]);
+
+  const createSchedule = async () => {
+    setSaving(true);
+    try {
+      const res = await api.post(`/invoices/${invoiceId}/recurring`, { frequency });
+      setSchedule(res.data);
+      setShowForm(false);
+      toast.success('Recurring schedule created');
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
+    finally { setSaving(false); }
+  };
+
+  const deleteSchedule = async () => {
+    if (!confirm('Remove recurring schedule?')) return;
+    try {
+      await api.delete(`/invoices/${invoiceId}/recurring`);
+      setSchedule(null);
+      toast.success('Schedule removed');
+    } catch { toast.error('Failed'); }
+  };
+
+  if (loading) return null;
+
+  return (
+    <Card delay={0.3}>
+      <div className="p-5">
+        <h3 className="text-sm font-semibold text-slate-800 mb-3">Recurring Schedule</h3>
+        {schedule ? (
+          <div className="flex items-center justify-between bg-indigo-50 rounded-lg p-3">
+            <div>
+              <p className="text-sm font-medium text-slate-700">
+                Repeats: <Badge color="indigo">{schedule.frequency}</Badge>
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Next: {new Date(schedule.nextRunDate).toLocaleDateString('en-PK', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {schedule.isActive ? '' : ' (Paused)'}
+              </p>
+            </div>
+            <Button variant="danger" size="sm" onClick={deleteSchedule}>Remove</Button>
+          </div>
+        ) : showForm ? (
+          <div className="space-y-3">
+            <select value={frequency} onChange={(e) => setFrequency(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+              <option value="WEEKLY">Weekly</option>
+              <option value="MONTHLY">Monthly</option>
+              <option value="QUARTERLY">Quarterly (every 3 months)</option>
+              <option value="YEARLY">Yearly</option>
+            </select>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={createSchedule} disabled={saving}>
+                {saving ? 'Setting up...' : 'Set Schedule'}
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <Button variant="secondary" size="sm" onClick={() => setShowForm(true)}>
+            Set up recurring invoice
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export default function InvoiceView() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -357,6 +436,9 @@ export default function InvoiceView() {
           </div>
         </Card>
       )}
+
+      {/* Recurring Schedule */}
+      <RecurringSection invoiceId={id} />
     </div>
   );
 }

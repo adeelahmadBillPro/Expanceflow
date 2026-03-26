@@ -281,4 +281,70 @@ router.delete('/:id', requireRole('OWNER', 'MANAGER', 'ACCOUNTANT'), async (req,
   }
 });
 
+// Create recurring schedule for an invoice
+router.post('/:id/recurring', requireRole('OWNER', 'MANAGER'), async (req, res) => {
+  try {
+    const { frequency, endDate } = req.body;
+    if (!['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'].includes(frequency)) {
+      return res.status(400).json({ error: 'Invalid frequency' });
+    }
+
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: req.params.id, orgId: req.orgId },
+    });
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+
+    // Check if schedule already exists
+    const existing = await prisma.recurringSchedule.findUnique({ where: { invoiceId: req.params.id } });
+    if (existing) return res.status(400).json({ error: 'Recurring schedule already exists for this invoice' });
+
+    // Calculate next run date
+    const nextRunDate = new Date();
+    switch (frequency) {
+      case 'WEEKLY': nextRunDate.setDate(nextRunDate.getDate() + 7); break;
+      case 'MONTHLY': nextRunDate.setMonth(nextRunDate.getMonth() + 1); break;
+      case 'QUARTERLY': nextRunDate.setMonth(nextRunDate.getMonth() + 3); break;
+      case 'YEARLY': nextRunDate.setFullYear(nextRunDate.getFullYear() + 1); break;
+    }
+
+    const schedule = await prisma.recurringSchedule.create({
+      data: {
+        orgId: req.orgId,
+        invoiceId: req.params.id,
+        frequency,
+        nextRunDate,
+        endDate: endDate ? new Date(endDate) : null,
+      },
+    });
+
+    await logActivity(req, { action: 'CREATE', entity: 'RecurringSchedule', entityId: schedule.id, details: `Set ${frequency} recurring for ${invoice.invoiceNumber}` });
+    res.status(201).json(schedule);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to create recurring schedule' });
+  }
+});
+
+// Get recurring schedule for an invoice
+router.get('/:id/recurring', async (req, res) => {
+  try {
+    const schedule = await prisma.recurringSchedule.findUnique({
+      where: { invoiceId: req.params.id },
+    });
+    res.json(schedule);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch schedule' });
+  }
+});
+
+// Delete recurring schedule
+router.delete('/:id/recurring', requireRole('OWNER', 'MANAGER'), async (req, res) => {
+  try {
+    await prisma.recurringSchedule.delete({ where: { invoiceId: req.params.id } });
+    res.json({ message: 'Recurring schedule removed' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to remove schedule' });
+  }
+});
+
 module.exports = router;
