@@ -1,0 +1,249 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+  --color-accent: #8b5cf6;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-dark: #0f172a;
+  --color-card: #ffffff;
+  --color-surface: #f8fafc;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #f1f5f9;
+}
+
+/* Modern Date Picker Overrides */
+.react-datepicker-wrapper { width: 100%; }
+.react-datepicker__input-container input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: all 0.2s;
+  background: white;
+}
+.react-datepicker__input-container input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+.react-datepicker {
+  font-family: 'Inter', system-ui !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
+  overflow: hidden;
+}
+.react-datepicker__header {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  border-bottom: none !important;
+  padding-top: 12px !important;
+  border-radius: 0 !important;
+}
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  color: white !important;
+  font-weight: 600 !important;
+}
+.react-datepicker__day--selected {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  border-radius: 0.5rem !important;
+  font-weight: 600 !important;
+}
+.react-datepicker__day:hover {
+  background: #eef2ff !important;
+  border-radius: 0.5rem !important;
+}
+.react-datepicker__day--today {
+  font-weight: 700 !important;
+  color: #6366f1 !important;
+}
+.react-datepicker__navigation-icon::before {
+  border-color: white !important;
+}
+
+/* Dark Mode - Comprehensive */
+.dark body,
+.dark .min-h-screen { background: #0b1120 !important; }
+
+/* Main content area */
+.dark .bg-\[#f1f5f9\],
+.dark .bg-\[\#f1f5f9\] { background: #0b1120 !important; }
+
+/* Cards and panels */
+.dark .bg-white { background: #151d2e !important; }
+.dark .bg-white\/80 { background: rgba(21, 29, 46, 0.9) !important; }
+.dark .bg-white\/70 { background: rgba(21, 29, 46, 0.85) !important; }
+
+/* Surface colors */
+.dark .bg-slate-50,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/60 { background: #1a2435 !important; }
+.dark .bg-slate-100 { background: #1e293b !important; }
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-50\/60:hover { background: #1e293b !important; }
+.dark .hover\:bg-slate-100:hover { background: #253347 !important; }
+
+/* Text */
+.dark .text-slate-800 { color: #f1f5f9 !important; }
+.dark .text-slate-700 { color: #e2e8f0 !important; }
+.dark .text-slate-600 { color: #cbd5e1 !important; }
+.dark .text-slate-500 { color: #94a3b8 !important; }
+.dark .text-slate-400 { color: #64748b !important; }
+.dark .text-gray-800 { color: #f1f5f9 !important; }
+.dark .text-gray-700 { color: #e2e8f0 !important; }
+
+/* Borders */
+.dark .border-slate-200,
+.dark .border-slate-100,
+.dark .border-slate-200\/60 { border-color: #1e293b !important; }
+.dark .border-gray-100,
+.dark .border-gray-200 { border-color: #1e293b !important; }
+.dark .divide-slate-100 > * + *,
+.dark .divide-slate-50 > * + * { border-color: #1e293b !important; }
+.dark .border-indigo-100,
+.dark .border-indigo-200 { border-color: #312e81 !important; }
+
+/* Inputs and selects */
+.dark input,
+.dark select,
+.dark textarea {
+  background: #1a2435 !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #6366f1 !important;
+}
+.dark input::placeholder { color: #475569 !important; }
+.dark input[disabled] { background: #0f172a !important; color: #64748b !important; }
+
+/* Shadows - subtle glow instead */
+.dark .shadow-sm { box-shadow: 0 0 0 1px rgba(30, 41, 59, 0.5) !important; }
+.dark .shadow-lg,
+.dark .shadow-xl,
+.dark .shadow-2xl { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important; }
+
+/* Badges and colored backgrounds */
+.dark .bg-indigo-50 { background: rgba(99, 102, 241, 0.15) !important; }
+.dark .bg-emerald-50,
+.dark .bg-green-50 { background: rgba(16, 185, 129, 0.15) !important; }
+.dark .bg-red-50 { background: rgba(239, 68, 68, 0.15) !important; }
+.dark .bg-amber-50 { background: rgba(245, 158, 11, 0.15) !important; }
+.dark .bg-blue-50 { background: rgba(59, 130, 246, 0.15) !important; }
+.dark .bg-violet-50 { background: rgba(139, 92, 246, 0.15) !important; }
+.dark .bg-indigo-50\/50 { background: rgba(99, 102, 241, 0.08) !important; }
+.dark .bg-emerald-50\/50 { background: rgba(16, 185, 129, 0.08) !important; }
+
+/* Header bar */
+.dark header { background: rgba(11, 17, 32, 0.85) !important; border-color: #1e293b !important; }
+
+/* Tables and list headers */
+.dark .bg-indigo-600,
+.dark .bg-gradient-to-r.from-indigo-600 { background: #4f46e5 !important; }
+
+/* Date picker dark mode */
+.dark .react-datepicker { background: #151d2e !important; border-color: #334155 !important; }
+.dark .react-datepicker__day { color: #e2e8f0 !important; }
+.dark .react-datepicker__day:hover { background: #334155 !important; }
+.dark .react-datepicker__day--outside-month { color: #475569 !important; }
+
+/* Modal overlay */
+.dark .backdrop-blur-sm { background: rgba(0, 0, 0, 0.6) !important; }
+
+/* Recharts dark */
+.dark .recharts-cartesian-grid line { stroke: #1e293b !important; }
+.dark .recharts-text { fill: #94a3b8 !important; }
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip { background: #151d2e !important; border-color: #334155 !important; }
+
+/* File inputs */
+.dark .file\:bg-indigo-50 { background: rgba(99, 102, 241, 0.15) !important; }
+
+/* Gradient backgrounds in dark mode - KEY FIX */
+.dark [class*="from-indigo-50"],
+.dark [class*="from-violet-50"],
+.dark [class*="from-emerald-50"],
+.dark [class*="from-blue-50"],
+.dark [class*="from-amber-50"],
+.dark .bg-gradient-to-r {
+  --tw-gradient-from: rgba(99, 102, 241, 0.1) !important;
+  --tw-gradient-to: rgba(139, 92, 246, 0.1) !important;
+}
+
+/* All light info boxes / banners */
+.dark [class*="bg-indigo-50"],
+.dark [class*="bg-violet-50"],
+.dark [class*="bg-emerald-50"],
+.dark [class*="bg-amber-50"],
+.dark [class*="bg-blue-50"],
+.dark [class*="bg-green-50"],
+.dark [class*="bg-red-50"] {
+  background: rgba(30, 41, 59, 0.5) !important;
+}
+
+/* Borders on colored boxes */
+.dark [class*="border-indigo-100"],
+.dark [class*="border-indigo-200"],
+.dark [class*="border-amber-200"],
+.dark [class*="border-emerald-100"],
+.dark [class*="border-red-200"] {
+  border-color: rgba(99, 102, 241, 0.2) !important;
+}
+
+/* Dashed borders */
+.dark .border-dashed { border-color: #334155 !important; }
+
+/* Color picker and special inputs */
+.dark input[type="color"] { background: #1a2435 !important; }
+
+/* Dropdown menu in dark */
+.dark [class*="shadow-xl"] { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important; }
+
+/* Tab toggles (email/phone toggle) */
+.dark [class*="bg-slate-100"] { background: #1e293b !important; }
+
+/* Ensure all text on gradient/colored backgrounds is visible */
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-gray-800,
+.dark .text-gray-700 { color: #e2e8f0 !important; }
+
+/* Print styles */
+@media print {
+  aside, header, .no-print { display: none !important; }
+  .lg\:ml-\[260px\] { margin-left: 0 !important; }
+  body { background: white !important; }
+  .bg-white { box-shadow: none !important; border: none !important; }
+  * { color: #000 !important; }
+}

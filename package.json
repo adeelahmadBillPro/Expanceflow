@@ -1,0 +1,17 @@
+{
+  "name": "expenseflow",
+  "version": "1.0.0",
+  "description": "Expense Tracker + Invoice Generator SaaS",
+  "scripts": {
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "db:migrate": "cd server && npx prisma migrate dev",
+    "db:seed": "cd server && node prisma/seed.js",
+    "build": "cd client && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

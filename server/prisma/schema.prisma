@@ -1,0 +1,420 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================
+// AUTH & USER
+// ========================
+model User {
+  id            String   @id @default(uuid())
+  email         String?  @unique
+  phone         String?  @unique
+  password      String?
+  name          String
+  avatar        String?
+  role          Role     @default(USER)
+  plan          Plan     @default(FREE)
+  trialEndsAt   DateTime? @map("trial_ends_at")
+  planExpiresAt DateTime? @map("plan_expires_at")
+  googleId      String?  @unique @map("google_id")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Organizations this user owns
+  ownedOrgs     Organization[]
+  // Team memberships
+  teamMembers   TeamMember[]
+
+  @@map("users")
+}
+
+// ========================
+// ORGANIZATION (Business/Company)
+// ========================
+model Organization {
+  id            String   @id @default(uuid())
+  ownerId       String   @map("owner_id")
+  name          String
+  logo          String?
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  ntn           String?
+  bankName      String?  @map("bank_name")
+  bankAccount   String?  @map("bank_account")
+  bankIban      String?  @map("bank_iban")
+  gstRate       Decimal  @default(17) @map("gst_rate") @db.Decimal(5,2)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members       TeamMember[]
+  expenses      Expense[]
+  categories    Category[]
+  budgets       Budget[]
+  clients       Client[]
+  products      Product[]
+  invoices      Invoice[]
+  payments      Payment[]
+  recurringSchedules RecurringSchedule[]
+
+  @@map("organizations")
+}
+
+// ========================
+// TEAM MEMBER (Employee)
+// ========================
+model TeamMember {
+  id            String     @id @default(uuid())
+  orgId         String     @map("org_id")
+  userId        String     @map("user_id")
+  teamRole      TeamRole   @default(VIEWER) @map("team_role")
+  isActive      Boolean    @default(true) @map("is_active")
+  joinedAt      DateTime   @default(now()) @map("joined_at")
+
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+  @@map("team_members")
+}
+
+enum TeamRole {
+  OWNER       // Full access + billing + team management
+  MANAGER     // Full access + team management (no billing)
+  ACCOUNTANT  // Expenses + invoices + reports + clients + products
+  CASHIER     // Add expenses + record payments only
+  VIEWER      // Read-only dashboard
+}
+
+// ========================
+// CATEGORIES
+// ========================
+model Category {
+  id            String   @id @default(uuid())
+  orgId         String?  @map("org_id")
+  name          String
+  icon          String?
+  color         String?
+  isDefault     Boolean  @default(false) @map("is_default")
+  type          CategoryType @default(EXPENSE)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  organization  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  expenses      Expense[]
+  budgets       Budget[]
+
+  @@map("categories")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Plan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum CategoryType {
+  EXPENSE
+  INCOME
+}
+
+// ========================
+// EXPENSES
+// ========================
+model Expense {
+  id            String   @id @default(uuid())
+  orgId         String   @map("org_id")
+  createdById   String   @map("created_by_id")
+  categoryId    String   @map("category_id")
+  amount        Decimal  @db.Decimal(12,2)
+  description   String?
+  notes         String?
+  date          DateTime @db.Date
+  paymentMethod PaymentMethod @default(CASH) @map("payment_method")
+  receiptUrl    String?  @map("receipt_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  category      Category     @relation(fields: [categoryId], references: [id])
+
+  @@map("expenses")
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CREDIT_CARD
+  DEBIT_CARD
+  JAZZCASH
+  EASYPAISA
+  CHEQUE
+  OTHER
+}
+
+// ========================
+// BUDGETS
+// ========================
+model Budget {
+  id            String   @id @default(uuid())
+  orgId         String   @map("org_id")
+  categoryId    String   @map("category_id")
+  amount        Decimal  @db.Decimal(12,2)
+  month         Int
+  year          Int
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  category      Category     @relation(fields: [categoryId], references: [id])
+
+  @@unique([orgId, categoryId, month, year])
+  @@map("budgets")
+}
+
+// ========================
+// CLIENTS
+// ========================
+model Client {
+  id            String   @id @default(uuid())
+  orgId         String   @map("org_id")
+  name          String
+  email         String?
+  phone         String?
+  company       String?
+  address       String?
+  city          String?
+  ntn           String?
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invoices      Invoice[]
+
+  @@map("clients")
+}
+
+// ========================
+// PRODUCTS / SERVICES
+// ========================
+model Product {
+  id            String   @id @default(uuid())
+  orgId         String   @map("org_id")
+  name          String
+  description   String?
+  barcode       String?
+  price         Decimal  @db.Decimal(12,2)
+  unit          String   @default("piece")
+  taxRate       Decimal  @default(17) @map("tax_rate") @db.Decimal(5,2)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invoiceItems  InvoiceItem[]
+
+  @@map("products")
+}
+
+// ========================
+// INVOICES
+// ========================
+model Invoice {
+  id            String   @id @default(uuid())
+  orgId         String   @map("org_id")
+  createdById   String   @map("created_by_id")
+  clientId      String   @map("client_id")
+  invoiceNumber String   @unique @map("invoice_number")
+  status        InvoiceStatus @default(DRAFT)
+  issueDate     DateTime @map("issue_date") @db.Date
+  dueDate       DateTime @map("due_date") @db.Date
+  subtotal      Decimal  @db.Decimal(12,2)
+  taxAmount     Decimal  @map("tax_amount") @db.Decimal(12,2)
+  discount      Decimal  @default(0) @db.Decimal(12,2)
+  discountType  DiscountType @default(FIXED) @map("discount_type")
+  grandTotal    Decimal  @map("grand_total") @db.Decimal(12,2)
+  amountPaid    Decimal  @default(0) @map("amount_paid") @db.Decimal(12,2)
+  notes         String?
+  terms         String?
+  pdfUrl        String?  @map("pdf_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  client        Client       @relation(fields: [clientId], references: [id])
+  items         InvoiceItem[]
+  payments      Payment[]
+  recurringSchedule RecurringSchedule?
+
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum DiscountType {
+  FIXED
+  PERCENTAGE
+}
+
+// ========================
+// INVOICE ITEMS
+// ========================
+model InvoiceItem {
+  id            String   @id @default(uuid())
+  invoiceId     String   @map("invoice_id")
+  productId     String?  @map("product_id")
+  name          String
+  description   String?
+  quantity      Decimal  @db.Decimal(10,2)
+  unitPrice     Decimal  @map("unit_price") @db.Decimal(12,2)
+  taxRate       Decimal  @default(17) @map("tax_rate") @db.Decimal(5,2)
+  taxAmount     Decimal  @map("tax_amount") @db.Decimal(12,2)
+  total         Decimal  @db.Decimal(12,2)
+
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product       Product? @relation(fields: [productId], references: [id])
+
+  @@map("invoice_items")
+}
+
+// ========================
+// PAYMENTS
+// ========================
+model Payment {
+  id            String   @id @default(uuid())
+  orgId         String   @map("org_id")
+  invoiceId     String   @map("invoice_id")
+  recordedById  String   @map("recorded_by_id")
+  amount        Decimal  @db.Decimal(12,2)
+  method        PaymentMethod @default(CASH)
+  reference     String?
+  notes         String?
+  paidAt        DateTime @default(now()) @map("paid_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invoice       Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+// ========================
+// RECURRING SCHEDULES
+// ========================
+model RecurringSchedule {
+  id            String   @id @default(uuid())
+  orgId         String   @map("org_id")
+  invoiceId     String   @unique @map("invoice_id")
+  frequency     Frequency @default(MONTHLY)
+  nextRunDate   DateTime @map("next_run_date") @db.Date
+  endDate       DateTime? @map("end_date") @db.Date
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invoice       Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("recurring_schedules")
+}
+
+enum Frequency {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+// ========================
+// ACTIVITY LOG (Audit Trail)
+// ========================
+model ActivityLog {
+  id            String   @id @default(uuid())
+  orgId         String   @map("org_id")
+  userId        String   @map("user_id")
+  userName      String   @map("user_name")
+  action        String
+  entity        String
+  entityId      String?  @map("entity_id")
+  details       String?
+  ipAddress     String?  @map("ip_address")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([orgId, createdAt])
+  @@map("activity_logs")
+}
+
+// ========================
+// PASSWORD RESET TOKENS
+// ========================
+model PasswordReset {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("password_resets")
+}
+
+// ========================
+// NOTIFICATIONS
+// ========================
+model Notification {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  userId    String?  @map("user_id")
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false) @map("is_read")
+  data      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([orgId, userId, isRead])
+  @@map("notifications")
+}
+
+// ========================
+// PLAN REQUESTS (Upgrade/Downgrade)
+// ========================
+model PlanRequest {
+  id            String        @id @default(uuid())
+  orgId         String        @map("org_id")
+  userId        String        @map("user_id")
+  requestedPlan Plan          @map("requested_plan")
+  currentPlan   Plan          @map("current_plan")
+  status        RequestStatus @default(PENDING)
+  adminNote     String?       @map("admin_note")
+  reviewedBy    String?       @map("reviewed_by")
+  reviewedAt    DateTime?     @map("reviewed_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  @@map("plan_requests")
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}

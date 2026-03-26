@@ -1,0 +1,33 @@
+{
+  "name": "expense-tracker-api",
+  "version": "1.0.0",
+  "description": "Expense Tracker + Invoice Generator SaaS API",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "db:migrate": "npx prisma migrate dev",
+    "db:seed": "node prisma/seed.js",
+    "db:reset": "npx prisma migrate reset --force"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.3.1",
+    "express-validator": "^7.3.1",
+    "helmet": "^8.1.0",
+    "hpp": "^0.2.3",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "pdfmake": "^0.2.15",
+    "resend": "^4.8.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9",
+    "prisma": "^6.5.0"
+  }
+}
